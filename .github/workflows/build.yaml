@@ -78,8 +78,8 @@ jobs:
 
       - name: Update chart version
         run: |
-          sed -i "s/^version: .*/version: ${{ needs.version.outputs.version }}/" chart/chart.yaml
-          sed -i "s/^appVersion: .*/appVersion: \"${{ needs.version.outputs.version }}\"/" chart/chart.yaml
+          sed -i "s/^version: .*/version: ${{ needs.version.outputs.version }}/" chart/Chart.yaml
+          sed -i "s/^appVersion: .*/appVersion: \"${{ needs.version.outputs.version }}\"/" chart/Chart.yaml
 
       - name: Update chart dependencies
         run: |

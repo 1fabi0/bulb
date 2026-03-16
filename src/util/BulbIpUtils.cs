@@ -3,7 +3,7 @@ using System.Text.RegularExpressions;
 
 namespace Bulb.Util
 {
-    public static class BulbIpUtils
+    public static partial class BulbIpUtils
     {
         public static (IPAddress? Ip, short Port) SplitIpAndPort(string input)
         {

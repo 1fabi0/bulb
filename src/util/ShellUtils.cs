@@ -1,12 +1,13 @@
 using System.Diagnostics;
 
-namespace Bulb.Util;
+namespace Bulb.Util
+{
 
-public static class ShellUtils
-{   
-    public static string RunCommand(string command, string args)
+    public static class ShellUtils
     {
-        var process = new Process
+        public static string RunCommand(string command, string args)
+        {
+            var process = new Process
             {
                 StartInfo = new ProcessStartInfo
                 {
@@ -30,5 +31,6 @@ public static class ShellUtils
             }
 
             return output;
+        }
     }
 }
