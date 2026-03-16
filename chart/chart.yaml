@@ -1,0 +1,11 @@
+apiVersion: v2
+name: bulb
+description: Bulb is a lightweight load balancer for Kubernetes.
+type: application
+version: 0.0.0
+appVersion: "0.0.0"
+
+dependencies:
+  - name: common
+    version: "2.x.x"
+    repository: "https://charts.bitnami.com/bitnami"

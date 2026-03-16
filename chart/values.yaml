@@ -1,0 +1,63 @@
+image:
+  repository: ghcr.io/1fabi0/bulb
+  tag: ""
+  pullPolicy: IfNotPresent
+
+nameOverride: ""
+fullnameOverride: ""
+
+commonLabels: {}
+commonAnnotations: {}
+
+podLabels: {}
+podAnnotations: {}
+
+serviceAccount:
+  create: true
+  name: ""
+  automountServiceAccountToken: true
+  labels: {}
+  annotations: {}
+
+daemonset:
+  updateStrategy:
+    type: RollingUpdate
+
+command: []
+args: []
+
+extraEnv: []
+extraVolumeMounts: []
+extraVolumes: []
+
+resources: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+rbac:
+  create: true
+  annotations: {}
+  rules:
+    - apiGroups: [""]
+      resources: ["pods", "services", "endpoints", "nodes"]
+      verbs: ["get", "list", "watch"]
+    - apiGroups: [""]
+      resources: ["services/status"]
+      verbs: ["get", "patch", "update"]
+    - apiGroups: ["discovery.k8s.io"]
+      resources: ["endpointslices"]
+      verbs: ["get", "list", "watch"]
+    - apiGroups: ["coordination.k8s.io"]
+      resources: ["leases"]
+      verbs: ["get", "list", "watch", "create", "update", "patch"]
+
+bulbConfiguration:
+  # set to true to enable updating the status of Kubernetes services with the load balancer IPs this may cause errors if you're cni doesn't support ipMode of loadbalancer status Ips
+  isServiceStatusUpdateEnabled: false 
+  # allowed: ipvs
+  backendSystem: "ipvs" 
+  # set to true to enable routing to the endpointslices of a service instead of service cluster ip can be overridden by setting the bulb.io/endpoint-routing-enabled annotation to true or false on a service
+  isEndpointRoutingEnabled: true 
+  # optional default scope for services without bulb.io/scope annotation, e.g. "default" or "cluster" or any other custom scope
+  defaultScope: "default" 

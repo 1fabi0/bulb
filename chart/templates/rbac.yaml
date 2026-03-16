@@ -1,0 +1,34 @@
+{{- if .Values.rbac.create }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "common.names.fullname" . }}
+  labels:
+    {{- include "common.labels.standard" (dict "customLabels" .Values.commonLabels "context" $) | nindent 4 }}
+  {{- $ann := merge (dict) (.Values.commonAnnotations | default dict) (.Values.rbac.annotations | default dict) }}
+  {{- if $ann }}
+  annotations:
+    {{- include "common.tplvalues.render" (dict "value" $ann "context" $) | nindent 4 }}
+  {{- end }}
+rules:
+  {{- toYaml .Values.rbac.rules | nindent 2 }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "common.names.fullname" . }}
+  labels:
+    {{- include "common.labels.standard" (dict "customLabels" .Values.commonLabels "context" $) | nindent 4 }}
+  {{- if $ann }}
+  annotations:
+    {{- include "common.tplvalues.render" (dict "value" $ann "context" $) | nindent 4 }}
+  {{- end }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "common.names.fullname" . }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "bulb.serviceAccountName" . }}
+    namespace: {{ .Release.Namespace }}
+{{- end }}

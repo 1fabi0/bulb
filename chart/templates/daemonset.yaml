@@ -1,0 +1,84 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ include "common.names.fullname" . }}
+  labels:
+    {{- include "common.labels.standard" (dict "customLabels" .Values.commonLabels "context" $) | nindent 4 }}
+  {{- with .Values.commonAnnotations }}
+  annotations:
+    {{- include "common.tplvalues.render" (dict "value" . "context" $) | nindent 4 }}
+  {{- end }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "common.labels.matchLabels" (dict "customLabels" .Values.commonLabels "context" $) | nindent 6 }}
+  updateStrategy:
+    {{- toYaml .Values.daemonset.updateStrategy | nindent 4 }}
+  template:
+    metadata:
+      labels:
+        {{- include "common.labels.matchLabels" (dict "customLabels" .Values.commonLabels "context" $) | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- include "common.tplvalues.render" (dict "value" . "context" $) | nindent 8 }}
+        {{- end }}
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- include "common.tplvalues.render" (dict "value" . "context" $) | nindent 8 }}
+      {{- end }}
+    spec:
+      serviceAccountName: {{ include "bulb.serviceAccountName" . }}
+      containers:
+        - name: bulb
+          image: "{{ .Values.image.repository }}:{{ default .Chart.AppVersion .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- with .Values.command }}
+          command:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.args }}
+          args:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          env:
+            - name: BulbConfiguration__IsServiceStatusUpdateEnabled
+              value: {{ .Values.bulbConfiguration.isServiceStatusUpdateEnabled | quote }}
+            - name: BulbConfiguration__BackendSystem
+              value: {{ .Values.bulbConfiguration.backendSystem | quote }}
+            - name: BulbConfiguration__IsEndpointRoutingEnabled
+              value: {{ .Values.bulbConfiguration.isEndpointRoutingEnabled | quote }}
+            - name: BulbConfiguration__NodeName
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: spec.nodeName
+            {{- if .Values.bulbConfiguration.defaultScope }}
+            - name: BulbConfiguration__DefaultScope
+              value: {{ .Values.bulbConfiguration.defaultScope | quote }}
+            {{- end }}
+            {{- with .Values.extraEnv }}
+            {{- include "common.tplvalues.render" (dict "value" . "context" $) | nindent 12 }}
+            {{- end }}
+          {{- with .Values.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.extraVolumeMounts }}
+          volumeMounts:
+            {{- include "common.tplvalues.render" (dict "value" . "context" $) | nindent 12 }}
+          {{- end }}
+      {{- with .Values.extraVolumes }}
+      volumes:
+        {{- include "common.tplvalues.render" (dict "value" . "context" $) | nindent 8 }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
