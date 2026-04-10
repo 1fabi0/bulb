@@ -29,6 +29,10 @@ namespace Bulb.Services.Listener
                         }
                         string backendAddress = BuildServiceAddress(backend.Address, backend.TargetPort, backend.IsIpv6);
                         IpVsUtil.RunIpvsAdm($"-a -{protocolOption} {serviceAddress} -r {backendAddress} -m");
+                        if(!backend.IsLocal)
+                        {
+                            IpTablesUtil.RunIpTables(BuildBackendSNatRule(backend.Address, backend.TargetPort, rule.IsTcp), isIpv6: backend.IsIpv6);
+                        }
                     }
                 }
                 else
@@ -39,22 +43,30 @@ namespace Bulb.Services.Listener
                         {
                             throw new InvalidOperationException("Backend and service IP versions do not match.");
                         }
-                        var existingBackend = existingRule.Backends.FirstOrDefault(b => b.Address.Equals(backend.Address) && b.TargetPort == backend.TargetPort);
+                        var existingBackend = existingRule.Backends.FirstOrDefault(b => b.Address.Equals(backend.Address) && b.TargetPort == backend.TargetPort && b.IsLocal == backend.IsLocal);
                         if (existingBackend == null)
                         {
                             // Backend doesn't exist, add it
                             string serviceAddress = BuildServiceAddress(rule.LoadbalancerIp, rule.LoadbalancerPort, rule.IsIpv6);
                             string backendAddress = BuildServiceAddress(backend.Address, backend.TargetPort, backend.IsIpv6);
                             IpVsUtil.RunIpvsAdm($"-a -{protocolOption} {serviceAddress} -r {backendAddress} -m");
+                            if(!backend.IsLocal)
+                            {
+                                IpTablesUtil.RunIpTables(BuildBackendSNatRule(backend.Address, backend.TargetPort, rule.IsTcp), isIpv6: backend.IsIpv6);
+                            }
                         }
                     }
-                    var backendsToDelete = existingRule.Backends.Where(backend => !rule.Backends.Any(b => b.Address.Equals(backend.Address) && b.TargetPort == backend.TargetPort));
+                    var backendsToDelete = existingRule.Backends.Where(backend => !rule.Backends.Any(b => b.Address.Equals(backend.Address) && b.TargetPort == backend.TargetPort && b.IsLocal == backend.IsLocal));
                     foreach (var backendToDelete in backendsToDelete)
                     {
                         // Backend exists but not in the new rule, remove it
                         string serviceAddress = BuildServiceAddress(rule.LoadbalancerIp, rule.LoadbalancerPort, rule.IsIpv6);
                         string backendAddress = BuildServiceAddress(backendToDelete.Address, backendToDelete.TargetPort, backendToDelete.IsIpv6);
                         IpVsUtil.RunIpvsAdm($"-d -{protocolOption} {serviceAddress} -r {backendAddress}");
+                        if(!backendToDelete.IsLocal)
+                        {
+                            IpTablesUtil.RunIpTables(BuildBackendSNatRule(backendToDelete.Address, backendToDelete.TargetPort, rule.IsTcp, delete: true), isIpv6: backendToDelete.IsIpv6);
+                        }
                     }
                 }
             }
@@ -66,6 +78,13 @@ namespace Bulb.Services.Listener
                 string protocolOption = GetProtocolOption(existingRule);
                 string serviceAddress = BuildServiceAddress(existingRule.LoadbalancerIp, existingRule.LoadbalancerPort, existingRule.IsIpv6);
                 IpVsUtil.RunIpvsAdm($"-D -{protocolOption} {serviceAddress}");
+                foreach (var backend in existingRule.Backends)
+                {
+                    if(!backend.IsLocal)
+                    {
+                        IpTablesUtil.RunIpTables(BuildBackendSNatRule(backend.Address, backend.TargetPort, existingRule.IsTcp, delete: true), isIpv6: backend.IsIpv6);
+                    }
+                }
             }
             return Task.CompletedTask;
         }
@@ -101,6 +120,11 @@ namespace Bulb.Services.Listener
         private static string BuildServiceAddress(IPAddress address, short port, bool isIpv6)
         {
             return isIpv6 ? $"[{address}]:{port}" : $"{address}:{port}";
-        }    
+        } 
+
+        private static string BuildBackendSNatRule(IPAddress backendIp, short backendPort, bool isTcp, bool delete = false)
+        {
+            return $"-t nat { (delete ? "-D" : "-A") } POSTROUTING -d {backendIp} -p {(isTcp ? "tcp" : "udp")} --dport {backendPort} -j MASQUERADE -m comment --comment \"/* bulb */\"";
+        }   
     }
 }
