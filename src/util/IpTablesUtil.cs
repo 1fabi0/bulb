@@ -1,4 +1,5 @@
 using System;
+using System.Net;
 using Bulb.Models;
 
 namespace Bulb.Util
@@ -20,41 +21,71 @@ namespace Bulb.Util
             foreach (var rawLine in lines)
             {
                 var line = rawLine.Trim();
-                // Match lines like "SNAT       tcp  --  anywhere             anywhere             tcp dpt:80 to:  
-                if (line.StartsWith("SNAT") && line.Contains("to:"))
+                if (!(line.StartsWith("SNAT") || line.StartsWith("MASQUERADE")))
                 {
-                    if (!line.EndsWith("/* bulb */"))
+                    continue;
+                }
+
+                if (!line.Contains("/* bulb */"))
+                {
+                    continue;
+                }
+
+                var parts = line.Split([' '], StringSplitOptions.RemoveEmptyEntries);
+                if (parts.Length < 5)
+                {
+                    continue;
+                }
+
+                var destinationPart = parts[4];
+                var dptPart = parts.FirstOrDefault(p => p.StartsWith("dpt:", StringComparison.Ordinal));
+                if (!IPAddress.TryParse(destinationPart, out var destinationIp) || dptPart == null)
+                {
+                    continue;
+                }
+
+                if (!short.TryParse(dptPart.Substring(4), out var destinationPort))
+                {
+                    continue;
+                }
+
+                var protPart = parts[1];
+                foreach (var rule in ipVsRules)
+                {
+                    if (!IsProtocolMatch(protPart, rule))
                     {
-                        continue; // Not a rule added by Bulb, ignore
+                        continue;
                     }
-                    var parts = line.Split([' '], StringSplitOptions.RemoveEmptyEntries);
-                    var toPart = parts.FirstOrDefault(p => p.StartsWith("to:"));
-                    var protPart = parts.FirstOrDefault(p => p == "6" || p == "17" || p == "0"); // 6 for TCP, 17 for UDP, 0 for any
-                    if (toPart != null && protPart != null)
+
+                    foreach (var backend in rule.Backends)
                     {
-                        var toValue = toPart.Substring(3); // Remove "to:"
-                        var (ip, port) = BulbIpUtils.SplitIpAndPort(toValue);
-                        if (ip != null)
+                        if (backend.Address.Equals(destinationIp) && backend.TargetPort == destinationPort)
                         {
-                            // Find the corresponding backend and mark it as non-local
-                            foreach (var rule in ipVsRules)
-                            {
-                                if (protPart != "0" && (!rule.IsTcp && protPart == "6" || rule.IsTcp && protPart == "17"))
-                                {
-                                    continue; // Protocol doesn't match, skip
-                                }
-                                foreach (var backend in rule.Backends)
-                                {
-                                    if (backend.Address.Equals(ip) && backend.TargetPort == port )
-                                    {
-                                        backend.IsLocal = false;
-                                    }
-                                }
-                            }
+                            backend.IsLocal = false;
                         }
                     }
                 }
             }
+        }
+
+        private static bool IsProtocolMatch(string protocol, BulbRule rule)
+        {
+            if (string.Equals(protocol, "0", StringComparison.OrdinalIgnoreCase) || string.Equals(protocol, "all", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            if (string.Equals(protocol, "6", StringComparison.OrdinalIgnoreCase) || string.Equals(protocol, "tcp", StringComparison.OrdinalIgnoreCase))
+            {
+                return rule.IsTcp;
+            }
+
+            if (string.Equals(protocol, "17", StringComparison.OrdinalIgnoreCase) || string.Equals(protocol, "udp", StringComparison.OrdinalIgnoreCase))
+            {
+                return rule.IsUdp;
+            }
+
+            return false;
         }
     }
 }
