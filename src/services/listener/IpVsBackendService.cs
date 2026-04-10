@@ -10,7 +10,7 @@ namespace Bulb.Services.Listener
         public Task ApplyRulesAsync(IEnumerable<BulbRule> rules, IEnumerable<ScopeNodeIp> nodeIps, CancellationToken cancellationToken)
         {
             var existingRules = GetExistingRules(nodeIps, cancellationToken).ToArray();
-            // todo: also use iptables source natting if target endpoint is not local
+
             foreach(var rule in rules)
             {
                 var existingRule = existingRules.FirstOrDefault(r => r.LoadbalancerIp.Equals(rule.LoadbalancerIp) && r.LoadbalancerPort == rule.LoadbalancerPort && r.IsTcp == rule.IsTcp);
@@ -43,7 +43,7 @@ namespace Bulb.Services.Listener
                         {
                             throw new InvalidOperationException("Backend and service IP versions do not match.");
                         }
-                        var existingBackend = existingRule.Backends.FirstOrDefault(b => b.Address.Equals(backend.Address) && b.TargetPort == backend.TargetPort && b.IsLocal == backend.IsLocal);
+                        var existingBackend = existingRule.Backends.FirstOrDefault(b => b.Address.Equals(backend.Address) && b.TargetPort == backend.TargetPort);
                         if (existingBackend == null)
                         {
                             // Backend doesn't exist, add it
@@ -55,8 +55,22 @@ namespace Bulb.Services.Listener
                                 IpTablesUtil.RunIpTables(BuildBackendSNatRule(backend.Address, backend.TargetPort, rule.IsTcp), isIpv6: backend.IsIpv6);
                             }
                         }
+                        else if(existingBackend.IsLocal != backend.IsLocal)
+                        {
+                            // Backend exists but local flag has changed, update it
+                            if(backend.IsLocal)
+                            {
+                                // Local flag changed to true, remove SNAT rule
+                                IpTablesUtil.RunIpTables(BuildBackendSNatRule(backend.Address, backend.TargetPort, rule.IsTcp, delete: true), isIpv6: backend.IsIpv6);
+                            }
+                            else
+                            {
+                                // Local flag changed to false, add SNAT rule
+                                IpTablesUtil.RunIpTables(BuildBackendSNatRule(backend.Address, backend.TargetPort, rule.IsTcp), isIpv6: backend.IsIpv6);
+                            }
+                        }
                     }
-                    var backendsToDelete = existingRule.Backends.Where(backend => !rule.Backends.Any(b => b.Address.Equals(backend.Address) && b.TargetPort == backend.TargetPort && b.IsLocal == backend.IsLocal));
+                    var backendsToDelete = existingRule.Backends.Where(backend => !rule.Backends.Any(b => b.Address.Equals(backend.Address) && b.TargetPort == backend.TargetPort));
                     foreach (var backendToDelete in backendsToDelete)
                     {
                         // Backend exists but not in the new rule, remove it
@@ -99,7 +113,7 @@ namespace Bulb.Services.Listener
             var ip6tablesOutput = IpTablesUtil.RunIpTables("-t nat -L -n", isIpv6: true);
             IpTablesUtil.ParseNatTableOutput(iptablesOutput + "\n" + ip6tablesOutput, rules);
 
-            return rules.Where(rule => nodeIps.Any(nodeIp => nodeIp.Address.Equals(rule.LoadbalancerIp.ToString())));
+            return rules.Where(rule => nodeIps.Any(nodeIp => nodeIp.Address.Equals(rule.LoadbalancerIp)));
         }
 
         private static string GetProtocolOption(BulbRule rule)
@@ -125,6 +139,6 @@ namespace Bulb.Services.Listener
         private static string BuildBackendSNatRule(IPAddress backendIp, short backendPort, bool isTcp, bool delete = false)
         {
             return $"-t nat { (delete ? "-D" : "-A") } POSTROUTING -d {backendIp} -p {(isTcp ? "tcp" : "udp")} --dport {backendPort} -j MASQUERADE -m comment --comment \"/* bulb */\"";
-        }   
+        }
     }
 }
