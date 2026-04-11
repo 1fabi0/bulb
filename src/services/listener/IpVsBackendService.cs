@@ -31,7 +31,7 @@ namespace Bulb.Services.Listener
                         IpVsUtil.RunIpvsAdm($"-a -{protocolOption} {serviceAddress} -r {backendAddress} -m");
                         if(!backend.IsLocal)
                         {
-                            IpTablesUtil.RunIpTables(BuildBackendSNatRule(backend.Address, backend.TargetPort, rule.IsTcp), isIpv6: backend.IsIpv6);
+                            IpTablesUtil.RunIpTables(BuildBackendSNatRule(rule.LoadbalancerIp, rule.LoadbalancerPort, backend.Address, backend.TargetPort, rule.IsTcp), isIpv6: backend.IsIpv6);
                         }
                     }
                 }
@@ -52,7 +52,7 @@ namespace Bulb.Services.Listener
                             IpVsUtil.RunIpvsAdm($"-a -{protocolOption} {serviceAddress} -r {backendAddress} -m");
                             if(!backend.IsLocal)
                             {
-                                IpTablesUtil.RunIpTables(BuildBackendSNatRule(backend.Address, backend.TargetPort, rule.IsTcp), isIpv6: backend.IsIpv6);
+                                IpTablesUtil.RunIpTables(BuildBackendSNatRule(rule.LoadbalancerIp, rule.LoadbalancerPort, backend.Address, backend.TargetPort, rule.IsTcp), isIpv6: backend.IsIpv6);
                             }
                         }
                         else if(existingBackend.IsLocal != backend.IsLocal)
@@ -61,12 +61,12 @@ namespace Bulb.Services.Listener
                             if(backend.IsLocal)
                             {
                                 // Local flag changed to true, remove SNAT rule
-                                IpTablesUtil.RunIpTables(BuildBackendSNatRule(backend.Address, backend.TargetPort, rule.IsTcp, delete: true), isIpv6: backend.IsIpv6);
+                                IpTablesUtil.RunIpTables(BuildBackendSNatRule(rule.LoadbalancerIp, rule.LoadbalancerPort, backend.Address, backend.TargetPort, rule.IsTcp, delete: true), isIpv6: backend.IsIpv6);
                             }
                             else
                             {
                                 // Local flag changed to false, add SNAT rule
-                                IpTablesUtil.RunIpTables(BuildBackendSNatRule(backend.Address, backend.TargetPort, rule.IsTcp), isIpv6: backend.IsIpv6);
+                                IpTablesUtil.RunIpTables(BuildBackendSNatRule(rule.LoadbalancerIp, rule.LoadbalancerPort, backend.Address, backend.TargetPort, rule.IsTcp), isIpv6: backend.IsIpv6);
                             }
                         }
                     }
@@ -79,7 +79,7 @@ namespace Bulb.Services.Listener
                         IpVsUtil.RunIpvsAdm($"-d -{protocolOption} {serviceAddress} -r {backendAddress}");
                         if(!backendToDelete.IsLocal)
                         {
-                            IpTablesUtil.RunIpTables(BuildBackendSNatRule(backendToDelete.Address, backendToDelete.TargetPort, rule.IsTcp, delete: true), isIpv6: backendToDelete.IsIpv6);
+                            IpTablesUtil.RunIpTables(BuildBackendSNatRule(rule.LoadbalancerIp, rule.LoadbalancerPort, backendToDelete.Address, backendToDelete.TargetPort, rule.IsTcp, delete: true), isIpv6: backendToDelete.IsIpv6);
                         }
                     }
                 }
@@ -96,7 +96,7 @@ namespace Bulb.Services.Listener
                 {
                     if(!backend.IsLocal)
                     {
-                        IpTablesUtil.RunIpTables(BuildBackendSNatRule(backend.Address, backend.TargetPort, existingRule.IsTcp, delete: true), isIpv6: backend.IsIpv6);
+                        IpTablesUtil.RunIpTables(BuildBackendSNatRule(existingRule.LoadbalancerIp, existingRule.LoadbalancerPort, backend.Address, backend.TargetPort, existingRule.IsTcp, delete: true), isIpv6: backend.IsIpv6);
                     }
                 }
             }
@@ -136,9 +136,10 @@ namespace Bulb.Services.Listener
             return isIpv6 ? $"[{address}]:{port}" : $"{address}:{port}";
         } 
 
-        private static string BuildBackendSNatRule(IPAddress backendIp, short backendPort, bool isTcp, bool delete = false)
+        private static string BuildBackendSNatRule(IPAddress loadBalancerIp, short loadBalancerPort, IPAddress backendIp, short backendPort, bool isTcp, bool delete = false)
         {
-            return $"-t nat { (delete ? "-D" : "-A") } POSTROUTING -d {backendIp} -p {(isTcp ? "tcp" : "udp")} --dport {backendPort} -j MASQUERADE -m comment --comment \"/* bulb */\"";
+            var vipCidr = loadBalancerIp.AddressFamily == System.Net.Sockets.AddressFamily.InterNetworkV6 ? $"{loadBalancerIp}/128" : $"{loadBalancerIp}/32";
+            return $"-t nat { (delete ? "-D" : "-A") } POSTROUTING -m ipvs --vaddr {vipCidr} --vport {loadBalancerPort} -d {backendIp} -p {(isTcp ? "tcp" : "udp")} --dport {backendPort} -j MASQUERADE -m comment --comment \"/* bulb */\"";
         }
     }
 }
