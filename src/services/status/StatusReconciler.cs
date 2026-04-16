@@ -32,11 +32,23 @@ namespace Bulb.Services.Status
             services = services.Where(svc => svc.Spec.Type == "LoadBalancer").ToList();
             _logger.LogInformation("{LoadBalancerServiceCount} services are of type LoadBalancer.", services.Count);
 
-            IEnumerable<ScopeNodeIp> bindingIps = _nodeCache.Get().SelectMany(n => n.Metadata.Annotations.Where(kv => kv.Key.StartsWith("bulb.io/bind-") && IPAddress.TryParse(kv.Value, out _))
-                .Select(kv => new ScopeNodeIp(kv.Key.TrimStart("bulb.io/bind-").ToString(), IPAddress.Parse(kv.Value))));
+            const string bindingAnnotationPrefix = "bulb.io/bind-";
+            const string displayAnnotationPrefix = "bulb.io/display-";
 
-            IEnumerable<ScopeNodeIp> displayIps = _nodeCache.Get().SelectMany(n => n.Metadata.Annotations.Where(kv => kv.Key.StartsWith("bulb.io/display-") && IPAddress.TryParse(kv.Value, out _))
-                .Select(kv => new ScopeNodeIp(kv.Key.TrimStart("bulb.io/display-").ToString(), IPAddress.Parse(kv.Value))));
+            IEnumerable<ScopeNodeIp> bindingIps = _nodeCache.Get()
+            .SelectMany(n => n.Metadata.Annotations
+                .Where(kv => kv.Key.StartsWith(bindingAnnotationPrefix))
+                .SelectMany(kv => kv.Value.Split(',')
+                    .Where(v => IPAddress.TryParse(v.Trim(), out _))
+                    .Select(v => new ScopeNodeIp(kv.Key.Substring(bindingAnnotationPrefix.Length), IPAddress.Parse(v.Trim())))));
+
+
+            IEnumerable<ScopeNodeIp> displayIps = _nodeCache.Get()
+            .SelectMany(n => n.Metadata.Annotations
+                .Where(kv => kv.Key.StartsWith(displayAnnotationPrefix))
+                .SelectMany(kv => kv.Value.Split(',')
+                    .Where(v => IPAddress.TryParse(v.Trim(), out _))
+                    .Select(v => new ScopeNodeIp(kv.Key.Substring(displayAnnotationPrefix.Length), IPAddress.Parse(v.Trim())))));
 
             IEnumerable<ScopeNodeIp> finalDisplayIps = bindingIps.Select(bi => 
                 { 

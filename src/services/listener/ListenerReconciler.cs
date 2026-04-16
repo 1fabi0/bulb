@@ -50,8 +50,12 @@ namespace Bulb.Services.Listener
             services = services.Where(svc => svc.Spec.Type == "LoadBalancer").ToList();
             _logger.LogInformation("{LoadBalancerServiceCount} services are of type LoadBalancer.", services.Count);
 
-            IEnumerable<ScopeNodeIp> bindingIps = myNode.Metadata.Annotations.Where(kv => kv.Key.StartsWith("bulb.io/bind-") && IPAddress.TryParse(kv.Value, out _))
-                .Select(kv => new ScopeNodeIp(kv.Key.TrimStart("bulb.io/bind-").ToString(), IPAddress.Parse(kv.Value)));
+            const string bindingAnnotationPrefix = "bulb.io/bind-";
+            IEnumerable<ScopeNodeIp> bindingIps = myNode.Metadata.Annotations
+            .Where(kv => kv.Key.StartsWith(bindingAnnotationPrefix))
+            .SelectMany(kv => kv.Value.Split(',')
+                .Where(v => IPAddress.TryParse(v.Trim(), out _))
+                .Select(v => new ScopeNodeIp(kv.Key.Substring(bindingAnnotationPrefix.Length), IPAddress.Parse(v.Trim()))));
 
             var bulbRules = new List<BulbRule>();
 
