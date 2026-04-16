@@ -49,10 +49,22 @@ namespace Bulb.Util
                     continue;
                 }
 
+                var virtualAddressPart = GetTokenValue(parts, "vaddr", "--vaddr");
+                var virtualPortPart = GetTokenValue(parts, "vport", "--vport");
+                if (!TryParseAddressToken(virtualAddressPart, out var virtualAddress) || !short.TryParse(virtualPortPart, out var virtualPort))
+                {
+                    continue;
+                }
+
                 var protPart = parts[1];
                 foreach (var rule in ipVsRules)
                 {
                     if (!IsProtocolMatch(protPart, rule))
+                    {
+                        continue;
+                    }
+
+                    if (!rule.LoadbalancerIp.Equals(virtualAddress) || rule.LoadbalancerPort != virtualPort)
                     {
                         continue;
                     }
@@ -66,6 +78,53 @@ namespace Bulb.Util
                     }
                 }
             }
+        }
+
+        private static string? GetTokenValue(string[] parts, params string[] tokenNames)
+        {
+            for (var index = 0; index < parts.Length; index++)
+            {
+                foreach (var tokenName in tokenNames)
+                {
+                    if (string.Equals(parts[index], tokenName, StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (index + 1 < parts.Length)
+                        {
+                            return parts[index + 1];
+                        }
+
+                        return null;
+                    }
+
+                    var prefix = tokenName + ":";
+                    if (parts[index].StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                    {
+                        return parts[index].Substring(prefix.Length);
+                    }
+                }
+            }
+
+            return null;
+        }
+
+        private static bool TryParseAddressToken(string? addressToken, out IPAddress parsedAddress)
+        {
+            if (string.IsNullOrWhiteSpace(addressToken))
+            {
+                parsedAddress = IPAddress.None;
+                return false;
+            }
+
+            var slashIndex = addressToken.IndexOf('/');
+            var normalizedAddress = slashIndex >= 0 ? addressToken.Substring(0, slashIndex) : addressToken;
+            if (IPAddress.TryParse(normalizedAddress, out var candidateAddress))
+            {
+                parsedAddress = candidateAddress;
+                return true;
+            }
+
+            parsedAddress = IPAddress.None;
+            return false;
         }
 
         private static bool IsProtocolMatch(string protocol, BulbRule rule)
