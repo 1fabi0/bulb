@@ -27,7 +27,8 @@ namespace Bulb.Util
 
             if (process.ExitCode != 0)
             {
-                throw new Exception($"ipvsadm failed with exit code {process.ExitCode}: {error}");
+                var invocation = string.IsNullOrWhiteSpace(args) ? command : $"{command} {args}";
+                throw new Exception($"Command '{invocation}' failed with exit code {process.ExitCode}: {error}");
             }
 
             return output;
