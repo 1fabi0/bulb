@@ -5,6 +5,7 @@ image:
 
 nameOverride: ""
 fullnameOverride: ""
+namespaceOverride: ""
 
 commonLabels: {}
 commonAnnotations: {}

@@ -30,5 +30,5 @@ roleRef:
 subjects:
   - kind: ServiceAccount
     name: {{ include "bulb.serviceAccountName" . }}
-    namespace: {{ .Release.Namespace }}
+    namespace: {{ include "common.names.namespace" . }}
 {{- end }}
