@@ -25,6 +25,13 @@ namespace Bulb.Services.Status
             _config = config;
         }
 
+        private static IReadOnlyCollection<string> SplitScopes(string? scopeValue)
+        {
+            return string.IsNullOrWhiteSpace(scopeValue)
+                ? Array.Empty<string>()
+                : scopeValue.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        }
+
         public async Task ReconcileAsync()
         {
             var services = _serviceCache.Get().ToList();
@@ -63,17 +70,18 @@ namespace Bulb.Services.Status
             foreach(var service in services)
             {
                 var bulbScope = service.Metadata.Annotations.FirstOrDefault(kv => kv.Key == "bulb.io/scope").Value;
-                if(bulbScope == null && _config.DefaultScope == null)
+                var serviceScopes = SplitScopes(bulbScope ?? _config.DefaultScope);
+                if(serviceScopes.Count == 0)
                 {
                     _logger.LogInformation("Service {Namespace}/{ServiceName} has no bulb scope annotation and no default scope is configured. Skipping.", service.Namespace(), service.Name());
                     // skip if no scope defined
                     continue;
                 }
                 
-                var scopeIps = finalDisplayIps.Where(bi => bi.Scope == (bulbScope ?? _config.DefaultScope));
-                if(!scopeIps.Any())
+                var scopeIps = finalDisplayIps.Where(bi => serviceScopes.Contains(bi.Scope)).ToList();
+                if(scopeIps.Count == 0)
                 {
-                    _logger.LogInformation("No binding IP found for service {Namespace}/{ServiceName} with scope {Scope}. Skipping.", service.Namespace(), service.Name(), bulbScope ?? _config.DefaultScope);
+                    _logger.LogInformation("No binding IP found for service {Namespace}/{ServiceName} with scopes {Scope}. Skipping.", service.Namespace(), service.Name(), string.Join(", ", serviceScopes));
                     continue;
                 }
 

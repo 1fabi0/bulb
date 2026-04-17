@@ -36,6 +36,13 @@ namespace Bulb.Services.Listener
             return _nodeCache.Get(name: _config.NodeName, @namespace: "default");
         }
 
+        private static IReadOnlyCollection<string> SplitScopes(string? scopeValue)
+        {
+            return string.IsNullOrWhiteSpace(scopeValue)
+                ? Array.Empty<string>()
+                : scopeValue.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        }
+
         public async Task ReconcileAsync()
         {
             var myNode = GetMyNode();
@@ -64,17 +71,18 @@ namespace Bulb.Services.Listener
                 var bulbScope = service.Metadata.Annotations.FirstOrDefault(kv => kv.Key == "bulb.io/scope").Value;
                 var bulbEndpointRoutingValue = service.Metadata.Annotations.FirstOrDefault(kv => kv.Key == "bulb.io/endpoint-routing-enabled").Value;
                 var bulbEndpointRoutingEnabled = bool.TryParse(bulbEndpointRoutingValue, out var parsedValue) ? parsedValue : _config.IsEndpointRoutingEnabled;
-                if(bulbScope == null && _config.DefaultScope == null)
+                var serviceScopes = SplitScopes(bulbScope ?? _config.DefaultScope);
+                if(serviceScopes.Count == 0)
                 {
                     _logger.LogInformation("Service {Namespace}/{ServiceName} has no bulb scope annotation and no default scope is configured. Skipping.", service.Namespace(), service.Name());
                     // skip if no scope defined
                     continue;
                 }
                 
-                var scopeIp = bindingIps.FirstOrDefault(bi => bi.Scope == (bulbScope ?? _config.DefaultScope));
-                if(scopeIp == null)
+                var scopeIps = bindingIps.Where(bi => serviceScopes.Contains(bi.Scope)).ToList();
+                if(scopeIps.Count == 0)
                 {
-                    _logger.LogInformation("No binding IP found for service {Namespace}/{ServiceName} with scope {Scope}. Skipping.", service.Namespace(), service.Name(), bulbScope ?? _config.DefaultScope);
+                    _logger.LogInformation("No binding IP found for service {Namespace}/{ServiceName} with scopes {Scope}. Skipping.", service.Namespace(), service.Name(), string.Join(", ", serviceScopes));
                     continue;
                 }
 
@@ -91,13 +99,16 @@ namespace Bulb.Services.Listener
                     }
 
                     _logger.LogInformation("Resolved {EndpointCount} endpoints for service {Namespace}/{ServiceName} port {Port}.", endpoints.Count(), service.Namespace(), service.Name(), servicePort.Port);
-                    
-                    var bulbRule = new BulbRule(
-                            backends: endpoints,
-                            loadbalancerIp: scopeIp.Address,
-                            loadbalancerPort: (short)servicePort.Port,
-                            protocol: servicePort.Protocol);
-                    bulbRules.Add(bulbRule);
+
+                    foreach (var scopeIp in scopeIps)
+                    {
+                        var bulbRule = new BulbRule(
+                                backends: endpoints,
+                                loadbalancerIp: scopeIp.Address,
+                                loadbalancerPort: (short)servicePort.Port,
+                                protocol: servicePort.Protocol);
+                        bulbRules.Add(bulbRule);
+                    }
                 }
             }
 
