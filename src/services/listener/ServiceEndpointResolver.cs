@@ -17,7 +17,7 @@ namespace Bulb.Services.Listener
             _logger = logger;
         }
 
-        public IEnumerable<TargetEndpoint> ResolveEndpointsForPortAsync(V1Service svc, V1Node myNode, V1ServicePort servicePort)
+        public IEnumerable<TargetEndpoint> ResolveEndpointsForServicePort(V1Service svc, V1Node myNode, V1ServicePort servicePort)
         {
             var targetPortValue = servicePort.TargetPort?.ToString();
             _logger.LogDebug(
@@ -128,7 +128,7 @@ namespace Bulb.Services.Listener
         {
             foreach (var endpoint in endpoints)
             {
-                if (endpoint.Conditions.Ready != true || endpoint.Conditions.Serving != true || endpoint.Conditions.Terminating == true)
+                if (endpoint.Conditions == null || endpoint.Conditions.Ready != true || endpoint.Conditions.Serving != true || endpoint.Conditions.Terminating == true)
                 {
                     continue;
                 }
