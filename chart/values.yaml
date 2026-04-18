@@ -24,6 +24,17 @@ daemonset:
   updateStrategy:
     type: RollingUpdate
 
+hostNetwork: true
+dnsPolicy: ClusterFirstWithHostNet
+
+podSecurityContext: {}
+
+containerSecurityContext:
+  privileged: true
+  capabilities:
+    add:
+      - NET_ADMIN
+
 command: []
 args: []
 
