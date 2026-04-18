@@ -95,7 +95,7 @@ namespace Bulb.Services.Listener
                     }
                     else
                     {
-                        endpoints = _serviceEndpointResolver.ResolveEndpointsForPortAsync(service, myNode, servicePort);
+                        endpoints = _serviceEndpointResolver.ResolveEndpointsForServicePort(service, myNode, servicePort);
                     }
 
                     var resolvedEndpoints = endpoints.ToList();
