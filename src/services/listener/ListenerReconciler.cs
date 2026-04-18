@@ -21,7 +21,7 @@ namespace Bulb.Services.Listener
             ICache<V1Node> nodeCache,
             ICache<V1Service> serviceCache,
             BulbConfiguration config,
-            ILogger logger)
+            ILogger<ListenerReconciler> logger)
         {
             _serviceEndpointResolver = serviceEndpointResolver;
             _loadBalancerBackendService = loadBalancerBackendService;
