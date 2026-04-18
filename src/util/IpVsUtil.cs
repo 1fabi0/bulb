@@ -28,7 +28,7 @@ namespace Bulb.Util
                 // 1. Match Virtual Service
                 if (line.StartsWith("TCP") || line.StartsWith("UDP"))
                 {
-                    currentProtocol = line.Substring(0, 3).Trim();
+                    var parsedProtocol = line.Substring(0, 3).Trim();
                     // Flush the previous rule before starting a new one
                     if (currentServiceIp != null)
                     {
@@ -40,6 +40,7 @@ namespace Bulb.Util
 
                     currentServiceIp = ip;
                     currentServicePort = port;
+                    currentProtocol = parsedProtocol;
                     currentBackends = new List<TargetEndpoint>();
                 }
                 // 2. Match Real Server (e.g., "-> 192.168.1.10:8080 Masq 1 0 0")
