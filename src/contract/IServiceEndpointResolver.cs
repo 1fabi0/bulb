@@ -5,6 +5,6 @@ namespace Bulb.Contract
 {
     public interface IServiceEndpointResolver
     {
-        IEnumerable<TargetEndpoint> ResolveEndpointsForPortAsync(V1Service svc, V1Node myNode, IntOrString servicePort);
+        IEnumerable<TargetEndpoint> ResolveEndpointsForPortAsync(V1Service svc, V1Node myNode, V1ServicePort servicePort);
     }
 }

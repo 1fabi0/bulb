@@ -95,15 +95,25 @@ namespace Bulb.Services.Listener
                     }
                     else
                     {
-                        endpoints = _serviceEndpointResolver.ResolveEndpointsForPortAsync(service, myNode, servicePort.TargetPort);
+                        endpoints = _serviceEndpointResolver.ResolveEndpointsForPortAsync(service, myNode, servicePort);
                     }
 
-                    _logger.LogInformation("Resolved {EndpointCount} endpoints for service {Namespace}/{ServiceName} port {Port}.", endpoints.Count(), service.Namespace(), service.Name(), servicePort.Port);
+                    var resolvedEndpoints = endpoints.ToList();
+                    _logger.LogInformation("Resolved {EndpointCount} endpoints for service {Namespace}/{ServiceName} port {Port}.", resolvedEndpoints.Count, service.Namespace(), service.Name(), servicePort.Port);
 
                     foreach (var scopeIp in scopeIps)
                     {
+                        var familyEndpoints = resolvedEndpoints
+                            .Where(ep => ep.IsIpv6 == scopeIp.Address.AddressFamily.Equals(System.Net.Sockets.AddressFamily.InterNetworkV6))
+                            .ToList();
+                        if (familyEndpoints.Count == 0)
+                        {
+                            _logger.LogInformation("No endpoints with matching address family found for service {Namespace}/{ServiceName} port {Port} and VIP {Vip}. Skipping rule.", service.Namespace(), service.Name(), servicePort.Port, scopeIp.Address);
+                            continue;
+                        }
+
                         var bulbRule = new BulbRule(
-                                backends: endpoints,
+                                backends: familyEndpoints,
                                 loadbalancerIp: scopeIp.Address,
                                 loadbalancerPort: (short)servicePort.Port,
                                 protocol: servicePort.Protocol);
