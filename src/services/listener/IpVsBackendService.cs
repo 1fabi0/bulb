@@ -111,7 +111,7 @@ namespace Bulb.Services.Listener
             var output = IpVsUtil.RunIpvsAdm("-Ln --exact");
             var rules = IpVsUtil.ParseIpVsAdmOutput(output);
 
-            var nftRules = NftablesUtil.GetExistingManagedRuleDefinitions();
+            var nftRules = NftablesUtil.GetExistingManagedRuleDefinitions().ToList();
             foreach (var rule in rules)
             {
                 foreach (var backend in rule.Backends)
