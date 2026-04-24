@@ -17,7 +17,7 @@ RUN dotnet publish "Bulb.csproj" \
 # Runtime Stage
 FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine
 
-RUN apk add --no-cache iptables ip6tables ipvsadm iproute2 kmod
+RUN apk add --no-cache iptables ip6tables ipvsadm iproute2 kmod nftables
 
 WORKDIR /app
 COPY --from=build /app/publish .

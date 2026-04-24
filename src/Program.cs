@@ -25,10 +25,13 @@ namespace Bulb
             {
                 builderListener.Services.AddSingleton<ILoadBalancerBackendService, IpVsBackendService>();
             }
+            else if(bulbConfig.BackendSystem == "nftables")
+            {
+                builderListener.Services.AddSingleton<ILoadBalancerBackendService, NftablesBackendService>();
+            }
             else
             {
-                //todo: implement iptables backend service
-                throw new NotSupportedException($"Backend system {bulbConfig.BackendSystem} is not yet supported.");
+                throw new NotSupportedException($"Backend system {bulbConfig.BackendSystem} is not supported.");
             }
             builderListener.Services.AddSingleton<IBulbReconciler, ListenerReconciler>();
             builderListener.Services.AddSingleton<IServiceEndpointResolver, ServiceEndpointResolver>();
