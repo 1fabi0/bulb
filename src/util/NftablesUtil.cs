@@ -136,7 +136,7 @@ namespace Bulb.Util
             var protocolMatch = rule.IsTcp ? "tcp" : "udp";
             var backendTargets = string.Join(", ", backends.Select((backend, index) => $"{index} : {BuildBackendMapDestination(backend)}"));
 
-            return $"prerouting {familyMatch} daddr {rule.LoadbalancerIp} {protocolMatch} dport {rule.LoadbalancerPort} dnat to numgen inc mod {backends.Length} map {{ {backendTargets} }} comment \"{BulbComment}\"";
+            return $"prerouting {familyMatch} daddr {rule.LoadbalancerIp} {protocolMatch} dport {rule.LoadbalancerPort} dnat {familyMatch} to numgen inc mod {backends.Length} map {{ {backendTargets} }} comment \"{BulbComment}\"";
         }
 
         public static string BuildMasqueradeRuleDefinition(BulbRule rule, TargetEndpoint backend)
