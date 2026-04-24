@@ -10,7 +10,7 @@ namespace Bulb.Services.Listener
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            var nodeIps = nodeInfos.Select(nodeInfo => nodeInfo.Address).ToHashSet();
+            var nodeIps = nodeInfos.Select(nodeInfo => nodeInfo.Address);
             var desiredRules = rules.Where(rule => nodeIps.Contains(rule.LoadbalancerIp));
 
             NftablesUtil.EnsureTableAndChains();

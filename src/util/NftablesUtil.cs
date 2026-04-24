@@ -138,13 +138,22 @@ namespace Bulb.Util
             return $"prerouting {familyMatch} daddr {rule.LoadbalancerIp} {protocolMatch} dport {rule.LoadbalancerPort} dnat to numgen inc mod {backends.Count()} map {{ {backendTargets} }} comment \"{BulbComment}\"";
         }
 
-        private static string BuildMasqueradeRuleDefinition(BulbRule rule, TargetEndpoint backend)
+        public static string BuildMasqueradeRuleDefinition(BulbRule rule, TargetEndpoint backend)
         {
             var familyMatch = rule.IsIpv6 ? "ip6" : "ip";
             var protocolMatch = rule.IsTcp ? "tcp" : "udp";
             var originalFamilyMatch = rule.IsIpv6 ? "ip6" : "ip";
 
             return $"postrouting {familyMatch} daddr {backend.Address} {protocolMatch} dport {backend.TargetPort} ct original {originalFamilyMatch} daddr {rule.LoadbalancerIp} ct original proto-dst {rule.LoadbalancerPort} masquerade comment \"{BulbComment}\"";
+        }
+
+        public static string BuildMasqueradeRuleDefinition(System.Net.IPAddress loadBalancerIp, short loadBalancerPort, System.Net.IPAddress backendIp, short backendPort, bool isTcp)
+        {
+            var familyMatch = loadBalancerIp.AddressFamily == System.Net.Sockets.AddressFamily.InterNetworkV6 ? "ip6" : "ip";
+            var protocolMatch = isTcp ? "tcp" : "udp";
+            var backendFamilyMatch = backendIp.AddressFamily == System.Net.Sockets.AddressFamily.InterNetworkV6 ? "ip6" : "ip";
+
+            return $"postrouting {familyMatch} daddr {backendIp} {protocolMatch} dport {backendPort} ct original {backendFamilyMatch} daddr {loadBalancerIp} ct original proto-dst {loadBalancerPort} masquerade comment \"{BulbComment}\"";
         }
 
         private static bool TryParseChainName(string line, out string chainName)
