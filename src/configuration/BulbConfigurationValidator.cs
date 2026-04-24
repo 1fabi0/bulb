@@ -42,9 +42,9 @@ internal static class BulbConfigurationValidator
         {
             failures.Add($"Missing required configuration: BackendSystem");
         }
-        else if (backendSystem != "ipvs" && backendSystem != "iptables")
+        else if (backendSystem != "ipvs" && backendSystem != "nftables")
         {
-            failures.Add($"Invalid value for BackendSystem. Allowed values are 'ipvs' or 'iptables'.");
+            failures.Add($"Invalid value for BackendSystem. Allowed values are 'ipvs' or 'nftables'.");
         }
 
         if (nodeName == null)

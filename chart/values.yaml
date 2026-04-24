@@ -70,7 +70,7 @@ rbac:
 bulbConfiguration:
   # set to true to enable updating the status of Kubernetes services with the load balancer IPs this may cause errors if you're cni doesn't support ipMode of loadbalancer status Ips
   isServiceStatusUpdateEnabled: false 
-  # allowed: ipvs
+  # allowed: ipvs, nftables
   backendSystem: "ipvs" 
   # set to true to enable routing to the endpointslices of a service instead of service cluster ip can be overridden by setting the bulb.io/endpoint-routing-enabled annotation to true or false on a service
   isEndpointRoutingEnabled: true 
