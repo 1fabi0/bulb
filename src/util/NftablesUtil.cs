@@ -15,8 +15,9 @@ namespace Bulb.Util
 
                 var backends = rule.Backends
                     .OrderBy(backend => backend.Address.ToString(), StringComparer.Ordinal)
-                    .ThenBy(backend => backend.TargetPort);
-                if (!backends.Any())
+                    .ThenBy(backend => backend.TargetPort)
+                    .ToArray();
+                if (backends.Length == 0)
                 {
                     continue;
                 }
@@ -111,9 +112,9 @@ namespace Bulb.Util
             }
         }
 
-        public static string BuildBackendDestination(TargetEndpoint backend)
+        private static string BuildBackendMapDestination(TargetEndpoint backend)
         {
-            return backend.IsIpv6 ? $"[{backend.Address}]:{backend.TargetPort}" : $"{backend.Address}:{backend.TargetPort}";
+            return $"{backend.Address} . {backend.TargetPort}";
         }
 
         private static bool CommandExists(string args)
@@ -129,13 +130,13 @@ namespace Bulb.Util
             }
         }
 
-        private static string BuildServiceRuleDefinition(BulbRule rule, IEnumerable<TargetEndpoint> backends)
+        private static string BuildServiceRuleDefinition(BulbRule rule, TargetEndpoint[] backends)
         {
             var familyMatch = rule.IsIpv6 ? "ip6" : "ip";
             var protocolMatch = rule.IsTcp ? "tcp" : "udp";
-            var backendTargets = string.Join(", ", backends.Select((backend, index) => $"{index} : {BuildBackendDestination(backend)}"));
+            var backendTargets = string.Join(", ", backends.Select((backend, index) => $"{index} : {BuildBackendMapDestination(backend)}"));
 
-            return $"prerouting {familyMatch} daddr {rule.LoadbalancerIp} {protocolMatch} dport {rule.LoadbalancerPort} dnat to numgen inc mod {backends.Count()} map {{ {backendTargets} }} comment \"{BulbComment}\"";
+            return $"prerouting {familyMatch} daddr {rule.LoadbalancerIp} {protocolMatch} dport {rule.LoadbalancerPort} dnat to numgen inc mod {backends.Length} map {{ {backendTargets} }} comment \"{BulbComment}\"";
         }
 
         public static string BuildMasqueradeRuleDefinition(BulbRule rule, TargetEndpoint backend)
