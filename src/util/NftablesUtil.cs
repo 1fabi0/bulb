@@ -54,17 +54,26 @@ namespace Bulb.Util
 
         public static void DeleteRule(string definition)
         {
-            RunNft($"delete rule inet bulb {definition}");
+            if (!TryDeleteRuleByHandle(definition))
+            {
+                throw new InvalidOperationException($"Managed rule not found for deletion: {definition}");
+            }
         }
 
         public static IEnumerable<string> GetExistingManagedRuleDefinitions()
         {
             var output = RunNft("-j -a list table inet bulb");
+            return ParseManagedRuleDefinitionsFromJson(output);
+        }
+
+        public static IEnumerable<string> ParseManagedRuleDefinitionsFromJson(string output)
+        {
             using var document = JsonDocument.Parse(output);
 
             if (!document.RootElement.TryGetProperty("nftables", out var nftables) || nftables.ValueKind != JsonValueKind.Array)
             {
-                return Enumerable.Empty<string>();
+                throw new InvalidOperationException(
+                    $"Unexpected nft JSON output: expected a root 'nftables' array when listing table 'inet bulb'. Output: {output}");
             }
 
             var managedRuleDefinitions = new List<string>();
@@ -88,6 +97,46 @@ namespace Bulb.Util
             }
 
             return managedRuleDefinitions;
+        }
+
+        private static bool TryDeleteRuleByHandle(string definition)
+        {
+            var output = RunNft("-j -a list table inet bulb");
+            using var document = JsonDocument.Parse(output);
+
+
+            if (!document.RootElement.TryGetProperty("nftables", out var nftables) || nftables.ValueKind != JsonValueKind.Array)
+            {
+                return false;
+            }
+
+            foreach (var element in nftables.EnumerateArray())
+            {
+                if (!element.TryGetProperty("rule", out var rule))
+                {
+                    continue;
+                }
+
+                if (!TryGetRuleComment(rule, out var comment) || !string.Equals(comment, BulbComment, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                if (!TryBuildManagedRuleDefinition(rule, out var currentDefinition) || !string.Equals(currentDefinition, definition, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                if (!TryGetStringProperty(rule, "chain", out var chainName) || !TryGetProperty(rule, "handle", out var handleElement) || !TryGetInt32Value(handleElement, out var handle))
+                {
+                    continue;
+                }
+
+                RunNft($"delete rule inet bulb {chainName} handle {handle}");
+                return true;
+            }
+
+            return false;
         }
 
         public static void EnsureTableAndChains()
@@ -166,12 +215,12 @@ namespace Bulb.Util
                 return false;
             }
 
-            if (!TryReadDnatStatement(expressions[^1], out var dnatFamilyMatch, out var backendTargets))
+            if (!TryReadDnatStatement(expressions[^1], out var dnatFamilyMatch, out var backendTargetMap))
             {
                 return false;
             }
 
-            ruleDefinition = $"{chainName} {familyMatch} daddr {loadBalancerIp} {protocolMatch} dport {loadBalancerPort} dnat {dnatFamilyMatch} to numgen inc mod {backendTargets.Length} map {{ {string.Join(", ", backendTargets.Select((backendTarget, index) => $"{index} : {backendTarget}"))} }} comment \"{BulbComment}\"";
+            ruleDefinition = $"{chainName} {familyMatch} daddr {loadBalancerIp} {protocolMatch} dport {loadBalancerPort} dnat {dnatFamilyMatch} to numgen inc mod {backendTargetMap.Length} map {{ {string.Join(", ", backendTargetMap.Select(backendTarget => $"{backendTarget.Key} : {backendTarget.Destination}"))} }} comment \"{BulbComment}\"";
             return true;
         }
 
@@ -199,7 +248,7 @@ namespace Bulb.Util
                 return false;
             }
 
-            if (!TryReadCtMatch(expressions[3], null, out _, out var loadBalancerPort))
+            if (!TryReadCtMatch(expressions[3], "proto-dst", out _, out var loadBalancerPort))
             {
                 return false;
             }
@@ -218,10 +267,10 @@ namespace Bulb.Util
             return true;
         }
 
-        private static bool TryReadDnatStatement(JsonElement statement, out string familyMatch, out string[] backendTargets)
+        private static bool TryReadDnatStatement(JsonElement statement, out string familyMatch, out (int Key, string Destination)[] backendTargetMap)
         {
             familyMatch = string.Empty;
-            backendTargets = [];
+            backendTargetMap = [];
 
             if (!statement.TryGetProperty("dnat", out var dnat) || dnat.ValueKind != JsonValueKind.Object)
             {
@@ -238,7 +287,7 @@ namespace Bulb.Util
                 return false;
             }
 
-            var backends = new List<(int Index, string Destination)>();
+            var backends = new List<(int Key, string Destination)>();
             foreach (var entry in set.EnumerateArray())
             {
                 if (entry.ValueKind != JsonValueKind.Array || entry.GetArrayLength() != 2)
@@ -246,19 +295,18 @@ namespace Bulb.Util
                     return false;
                 }
 
-                if (!TryGetInt32Value(entry[0], out var index) || !TryBuildBackendTarget(entry[1], out var destination))
+                if (!TryGetInt32Value(entry[0], out var key) || !TryBuildBackendTarget(entry[1], out var destination))
                 {
                     return false;
                 }
 
-                backends.Add((index, destination));
+                backends.Add((key, destination));
             }
 
-            backendTargets = backends
-                .OrderBy(backend => backend.Index)
-                .Select(backend => backend.Destination)
+            backendTargetMap = backends
+                .OrderBy(backend => backend.Key)
                 .ToArray();
-            return backendTargets.Length > 0;
+            return backendTargetMap.Length > 0;
         }
 
         private static bool TryBuildBackendTarget(JsonElement expression, out string backendTarget)
