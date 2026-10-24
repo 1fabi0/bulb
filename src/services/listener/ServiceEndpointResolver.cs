@@ -9,7 +9,7 @@ namespace Bulb.Services.Listener
     public class ServiceEndpointResolver : IServiceEndpointResolver
     {
         private readonly ICache<V1EndpointSlice> _endpointSliceCache;
-        private readonly ILogger<ServiceEndpointResolver> _logger;
+        private readonly ILogger _logger;
 
         public ServiceEndpointResolver(ICache<V1EndpointSlice> endpointSliceCache, ILogger<ServiceEndpointResolver> logger)
         {
