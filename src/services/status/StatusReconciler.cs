@@ -117,48 +117,53 @@ namespace Bulb.Services.Status
 
         private static bool StatusEqual(V1ServiceStatus s1, V1ServiceStatus s2)
         {
-            if(s1.LoadBalancer == null && s2.LoadBalancer == null)
+            if (s1.LoadBalancer == null && s2.LoadBalancer == null)
             {
                 return true;
             }
-            if(s1.LoadBalancer == null || s2.LoadBalancer == null)
-            {
-                return false;
-            }
-            if(s1.LoadBalancer.Ingress.Count != s2.LoadBalancer.Ingress.Count)
+            if (s1.LoadBalancer == null || s2.LoadBalancer == null)
             {
                 return false;
             }
 
-            for(int i = 0; i < s1.LoadBalancer.Ingress.Count; i++)
+            var ingress1 = s1.LoadBalancer.Ingress ?? Array.Empty<V1LoadBalancerIngress>();
+            var ingress2 = s2.LoadBalancer.Ingress ?? Array.Empty<V1LoadBalancerIngress>();
+
+            if (ingress1.Count != ingress2.Count)
             {
-                var i1 = s1.LoadBalancer.Ingress[i];
-                var i2 = s2.LoadBalancer.Ingress[i];
-                if(i1.Ip != i2.Ip || i1.Hostname != i2.Hostname || i1.IpMode != i2.IpMode)
+                return false;
+            }
+
+            for (int i = 0; i < ingress1.Count; i++)
+            {
+                var i1 = ingress1[i];
+                var i2 = ingress2[i];
+
+                if (i1.Ip != i2.Ip || i1.Hostname != i2.Hostname || i1.IpMode != i2.IpMode)
                 {
                     return false;
                 }
-                if ((i1.Ports == null) != (i2.Ports == null))
+
+                var ports1 = i1.Ports ?? (IList<V1PortStatus>)Array.Empty<V1PortStatus>();
+                var ports2 = i2.Ports ?? (IList<V1PortStatus>)Array.Empty<V1PortStatus>();
+
+                if (ports1.Count != ports2.Count)
                 {
                     return false;
                 }
-                if (i1.Ports != null && i2.Ports != null)
+
+                for (int jp = 0; jp < ports1.Count; jp++)
                 {
-                    if (i1.Ports.Count != i2.Ports.Count)
+                    var p1 = ports1[jp];
+                    var p2 = ports2[jp];
+
+                    if (p1.Port != p2.Port || p1.Protocol != p2.Protocol)
                     {
                         return false;
                     }
-                    for (int jp = 0; jp < i1.Ports.Count; jp++)
-                    {
-                        var p1 = i1.Ports[jp];
-                        var p2 = i2.Ports[jp];
-                        if (p1.Port != p2.Port || p1.Protocol != p2.Protocol)
-                        {
-                            return false;
-                        }
-                    }
                 }
             }
+
             return true;
         }
     }
