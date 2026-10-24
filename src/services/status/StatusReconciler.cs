@@ -16,7 +16,7 @@ namespace Bulb.Services.Status
         private readonly ILogger _logger;
         private readonly BulbConfiguration _config;
 
-        public StatusReconciler(ICache<V1Node> nodeCache, ICache<V1Service> serviceCache, IKubernetesClient kubernetesClient, ILogger logger, BulbConfiguration config)
+        public StatusReconciler(ICache<V1Node> nodeCache, ICache<V1Service> serviceCache, IKubernetesClient kubernetesClient, ILogger<StatusReconciler> logger, BulbConfiguration config)
         {
             _nodeCache = nodeCache;
             _serviceCache = serviceCache;
