@@ -9,9 +9,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="KubeOps.Abstractions" Version="10.2.4" />
-    <PackageReference Include="KubeOps.KubernetesClient" Version="10.2.4" />
-    <PackageReference Include="KubeOps.Operator" Version="10.2.4" />
+    <PackageReference Include="KubeOps.Abstractions" Version="13.3.4" />
+    <PackageReference Include="KubeOps.KubernetesClient" Version="13.3.4" />
+    <PackageReference Include="KubeOps.Operator" Version="13.3.4" />
   </ItemGroup>
 
 </Project>
