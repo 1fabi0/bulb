@@ -43,43 +43,47 @@ namespace Bulb.Services.Status
             const string displayAnnotationPrefix = "bulb.io/display-";
 
             IEnumerable<ScopeNodeIp> bindingIps = _nodeCache.Get()
-            .SelectMany(n => n.Metadata.Annotations
-                .Where(kv => kv.Key.StartsWith(bindingAnnotationPrefix))
-                .SelectMany(kv => kv.Value.Split(',')
-                    .Where(v => IPAddress.TryParse(v.Trim(), out _))
-                    .Select(v => new ScopeNodeIp(kv.Key.Substring(bindingAnnotationPrefix.Length), IPAddress.Parse(v.Trim())))));
-
+                .SelectMany(n => (n.Metadata?.Annotations ?? new Dictionary<string, string>())
+                    .Where(kv => kv.Key.StartsWith(bindingAnnotationPrefix))
+                    .SelectMany(kv => kv.Value.Split(',')
+                        .Where(v => IPAddress.TryParse(v.Trim(), out _))
+                        .Select(v => new ScopeNodeIp(kv.Key.Substring(bindingAnnotationPrefix.Length), IPAddress.Parse(v.Trim()), n.Metadata?.Name))))
+                .ToList();
 
             IEnumerable<ScopeNodeIp> displayIps = _nodeCache.Get()
-            .SelectMany(n => n.Metadata.Annotations
-                .Where(kv => kv.Key.StartsWith(displayAnnotationPrefix))
-                .SelectMany(kv => kv.Value.Split(',')
-                    .Where(v => IPAddress.TryParse(v.Trim(), out _))
-                    .Select(v => new ScopeNodeIp(kv.Key.Substring(displayAnnotationPrefix.Length), IPAddress.Parse(v.Trim())))));
+                .SelectMany(n => (n.Metadata?.Annotations ?? new Dictionary<string, string>())
+                    .Where(kv => kv.Key.StartsWith(displayAnnotationPrefix))
+                    .SelectMany(kv => kv.Value.Split(',')
+                        .Where(v => IPAddress.TryParse(v.Trim(), out _))
+                        .Select(v => new ScopeNodeIp(kv.Key.Substring(displayAnnotationPrefix.Length), IPAddress.Parse(v.Trim()), n.Metadata?.Name))))
+                .ToList();
 
-            IEnumerable<ScopeNodeIp> finalDisplayIps = bindingIps.Select(bi => 
-                { 
-                    var displayIp = displayIps.FirstOrDefault(di => di.Scope == bi.Scope);
-                    if(displayIp == null)
-                    { 
-                        return bi; 
-                    } 
-                    return displayIp;
-                });
+            var displayKeys = displayIps.Select(d => $"{d.NodeName}_{d.Scope}_{d.Address}").ToHashSet();
 
-            foreach(var service in services)
+            IEnumerable<ScopeNodeIp> finalDisplayIps = bindingIps
+                .Concat(displayIps)
+                .GroupBy(bi => new { bi.NodeName, bi.Scope })
+                .Select(g =>
+                    g.FirstOrDefault(x => displayKeys.Contains($"{x.NodeName}_{x.Scope}_{x.Address}"))
+                    ?? g.First()
+                )
+                .DistinctBy(x => new { x.Scope, x.Address })
+                .ToList();
+
+
+            foreach (var service in services)
             {
                 var bulbScope = service.Metadata.Annotations.FirstOrDefault(kv => kv.Key == "bulb.io/scope").Value;
                 var serviceScopes = SplitScopes(bulbScope ?? _config.DefaultScope);
-                if(serviceScopes.Count == 0)
+                if (serviceScopes.Count == 0)
                 {
                     _logger.LogInformation("Service {Namespace}/{ServiceName} has no bulb scope annotation and no default scope is configured. Skipping.", service.Namespace(), service.Name());
                     // skip if no scope defined
                     continue;
                 }
-                
+
                 var scopeIps = finalDisplayIps.Where(bi => serviceScopes.Contains(bi.Scope)).ToList();
-                if(scopeIps.Count == 0)
+                if (scopeIps.Count == 0)
                 {
                     _logger.LogInformation("No binding IP found for service {Namespace}/{ServiceName} with scopes {Scope}. Skipping.", service.Namespace(), service.Name(), string.Join(", ", serviceScopes));
                     continue;
@@ -89,20 +93,20 @@ namespace Bulb.Services.Status
                 {
                     LoadBalancer = new V1LoadBalancerStatus
                     {
-                        Ingress = [.. scopeIps.Select(si => new V1LoadBalancerIngress 
-                            { 
+                        Ingress = [.. scopeIps.Select(si => new V1LoadBalancerIngress
+                            {
                                 Ip = si.Address.ToString(),
-                                Ports = [.. service.Spec.Ports.Select(p => new V1PortStatus 
-                                { 
+                                Ports = [.. service.Spec.Ports.Select(p => new V1PortStatus
+                                {
                                     Port = p.Port,
-                                    Protocol = p.Protocol 
+                                    Protocol = p.Protocol
                                 })],
                                 IpMode = "Proxy"
-                            })], 
+                            })],
                     }
                 };
 
-                if(service.Status == null || !StatusEqual(serviceStatus, service.Status))
+                if (service.Status == null || !StatusEqual(serviceStatus, service.Status))
                 {
                     service.Status = serviceStatus;
                     await _kubernetesClient.UpdateStatusAsync(service);

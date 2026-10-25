@@ -128,7 +128,15 @@ namespace Bulb.Services.Listener
         {
             foreach (var endpoint in endpoints)
             {
-                if (endpoint.Conditions == null || endpoint.Conditions.Ready != true || endpoint.Conditions.Serving != true || endpoint.Conditions.Terminating == true)
+                if (endpoint.Conditions == null)
+                {
+                    continue;
+                }
+
+                bool isUsable = (endpoint.Conditions.Ready == true || endpoint.Conditions.Serving == true)
+                                && endpoint.Conditions.Terminating != true;
+
+                if (!isUsable)
                 {
                     continue;
                 }
