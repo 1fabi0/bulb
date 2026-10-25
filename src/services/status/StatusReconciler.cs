@@ -58,18 +58,17 @@ namespace Bulb.Services.Status
                         .Select(v => new ScopeNodeIp(kv.Key.Substring(displayAnnotationPrefix.Length), IPAddress.Parse(v.Trim()), n.Metadata?.Name))))
                 .ToList();
 
-            var displayKeys = displayIps.Select(d => $"{d.NodeName}_{d.Scope}_{d.Address}").ToHashSet();
+            var displayKeys = displayIps.Select(d => $"{d.NodeName}_{d.Scope}_{(d.IsIpv6 ? "ipv6" : "ipv4")}_{d.Address}").ToHashSet();
 
             IEnumerable<ScopeNodeIp> finalDisplayIps = bindingIps
                 .Concat(displayIps)
-                .GroupBy(bi => new { bi.NodeName, bi.Scope })
+                .GroupBy(bi => new { bi.NodeName, bi.Scope, bi.IsIpv6 })
                 .Select(g =>
-                    g.FirstOrDefault(x => displayKeys.Contains($"{x.NodeName}_{x.Scope}_{x.Address}"))
+                    g.FirstOrDefault(x => displayKeys.Contains($"{x.NodeName}_{x.Scope}_{(x.IsIpv6 ? "ipv6" : "ipv4")}_{x.Address}"))
                     ?? g.First()
                 )
                 .DistinctBy(x => new { x.Scope, x.Address })
                 .ToList();
-
 
             foreach (var service in services)
             {
